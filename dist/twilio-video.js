@@ -381,7 +381,7 @@ Client.prototype.toString = function toString() {
  *   });
  * });
  */
-Client.prototype.connect = function connect(options) {
+Client.prototype.connect = function connect(options, localMedia) {
   options = Object.assign({
     to: null
   }, this._options, options);
@@ -390,8 +390,17 @@ Client.prototype.connect = function connect(options) {
   log.info('Connecting to a Room');
   log.debug('Options:', options);
 
+  var localMediaGetter;
+  if (!localMedia) {
+    localMediaGetter = getLocalMedia.bind(null, this, options);
+  } else {
+    localMediaGetter = function  (cb) {
+      return cb(localMedia);
+    };
+  }
+
   var cancelableRoomPromise = createCancelableRoomPromise(
-    getLocalMedia.bind(null, this, options),
+    localMediaGetter,
     createLocalParticipant.bind(null, this),
     createRoomSignaling.bind(null, this, options),
     createRoom.bind(null, this, options));
@@ -1893,7 +1902,13 @@ Track.prototype._attach = function _attach(el) {
   var _MediaStream = typeof webkitMediaStream !== 'undefined'
     ? webkitMediaStream
     : MediaStream;
-  var mediaStream = new _MediaStream();
+
+  var mediaStream;
+  if (typeof cordova !== 'undefined' && cordova.plugins.iosrtc) {
+    mediaStream = MediaStream.create(this.mediaStream);
+  } else {
+    mediaStream = new _MediaStream();
+  }
   mediaStream.addTrack(this.mediaStreamTrack);
 
   if (typeof navigator.webkitGetUserMedia === 'function') {
@@ -4136,6 +4151,27 @@ function PeerConnectionV2(id, options) {
 
   var RTCPeerConnection = options.RTCPeerConnection;
   var peerConnection = new RTCPeerConnection(configuration);
+  if (typeof cordova !== 'undefined' && cordova.plugins.iosrtc) {
+    peerConnection.onaddstream = function  (event) {
+      var mediaStream = event.stream;
+
+      mediaStream.addEventListener('addtrack', function onaddtrack(addTrackEvent) {
+        var mediaStreamTrack = addTrackEvent.track;
+        var newEvent = new Event('track');
+        newEvent.track = mediaStreamTrack;
+        newEvent.receiver = { track: mediaStreamTrack };
+        newEvent.streams = [mediaStream];
+        peerConnection.dispatchEvent(newEvent);
+      });
+
+      mediaStream.getTracks().forEach(function(mediaStreamTrack) {
+        var newEvent = new Event('track');
+        newEvent.track = mediaStreamTrack;
+        newEvent.streams = [mediaStream];
+        peerConnection.dispatchEvent(newEvent);
+      });
+    };
+  }
 
   Object.defineProperties(this, {
     _descriptionRevision: {
@@ -8305,7 +8341,9 @@ module.exports = getUserMedia;
 /* global mozRTCIceCandidate, RTCIceCandidate */
 'use strict';
 
-if (typeof mozRTCIceCandidate !== 'undefined') {
+if (typeof cordova !== 'undefined' && cordova.plugins.iosrtc) {
+  module.exports = cordova.plugins.iosrtc.RTCIceCandidate;
+} else if (typeof mozRTCIceCandidate !== 'undefined') {
   module.exports = mozRTCIceCandidate;
 } else if (typeof RTCIceCandidate !== 'undefined') {
   module.exports = RTCIceCandidate;
@@ -8997,7 +9035,9 @@ module.exports = FirefoxRTCPeerConnection;
 /* globals mozRTCPeerConnection, RTCPeerConnection, webkitRTCPeerConnection */
 'use strict';
 
-if (typeof webkitRTCPeerConnection !== 'undefined') {
+if (typeof cordova !== 'undefined' && cordova.plugins.iosrtc) {
+  module.exports = cordova.plugins.iosrtc.RTCPeerConnection;
+} else if (typeof webkitRTCPeerConnection !== 'undefined') {
   module.exports = require('./chrome');
 } else if (typeof mozRTCPeerConnection !== 'undefined') {
   module.exports = require('./firefox');
@@ -9092,7 +9132,9 @@ module.exports = mozRTCSessionDescription;
 /* globals mozRTCSessionDescription, RTCSessionDescription, webkitRTCPeerConnection */
 'use strict';
 
-if (typeof webkitRTCPeerConnection !== 'undefined') {
+if (typeof cordova !== 'undefined' && cordova.plugins.iosrtc) {
+  module.exports = cordova.plugins.iosrtc.RTCSessionDescription;
+} else if (typeof webkitRTCPeerConnection !== 'undefined') {
   module.exports = require('./chrome');
 } else if (typeof mozRTCSessionDescription !== 'undefined') {
   module.exports = require('./firefox');
@@ -11256,7 +11298,7 @@ module.exports={
           "directUrl": "https://raw.githubusercontent.com/twilio/SIP.js/420ed46ba6751b32e99950fb6fb84683afb820cc/package.json"
         }
       },
-      "/home/travis/build/twilio/twilio-video.js"
+      "/home/ivo/git/twilio-video.js"
     ]
   ],
   "_from": "twilio/SIP.js#420ed46ba6751b32e99950fb6fb84683afb820cc",
@@ -11286,10 +11328,10 @@ module.exports={
     "/"
   ],
   "_resolved": "git://github.com/twilio/SIP.js.git#420ed46ba6751b32e99950fb6fb84683afb820cc",
-  "_shasum": "964da52f1f19b7ad6662d83ad03a3bac705a36dc",
+  "_shasum": "2ba48b8d45b782199c9fa712d0481cee7504e2c2",
   "_shrinkwrap": null,
   "_spec": "sip.js@github:twilio/SIP.js#420ed46ba6751b32e99950fb6fb84683afb820cc",
-  "_where": "/home/travis/build/twilio/twilio-video.js",
+  "_where": "/home/ivo/git/twilio-video.js",
   "author": {
     "name": "OnSIP",
     "email": "developer@onsip.com",
